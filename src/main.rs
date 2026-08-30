@@ -3,55 +3,61 @@
 
 use core::panic::PanicInfo;
 use core::arch::asm;
+use core::arch::x86_64::_rdtsc;
 
-#[repr(C, packed)]
-pub struct Multiboot2Header {
-    magic: u32,
-    architecture: u32,
-    header_length: u32,
-    checksum: u32,
-    end_tag: u16,
-    end_flags: u16,
-    end_size: u32,
+core::arch::global_asm!(include_str!("boot.s"), options(att_syntax));
+
+extern "C" {
+    static header_start: u32;
 }
+#[used]
+static KEEP_HEADER: &u32 = unsafe { &header_start };
 
-const MAGIC: u32 = 0xE85250D6;
-const ARCH: u32 = 0; // x86
-const LENGTH: u32 = 24;
-
-#[link_section = ".multiboot_header"]
 #[no_mangle]
-pub static MULTIBOOT2_HEADER: Multiboot2Header = Multiboot2Header {
-    magic: MAGIC,
-    architecture: ARCH,
-    header_length: LENGTH,
-    checksum: (0u32.wrapping_sub(MAGIC).wrapping_sub(ARCH).wrapping_sub(LENGTH)),
-    end_tag: 0,
-    end_flags: 0,
-    end_size: 8,
-};
-
-fn serial_write(s: &str) {
-    for b in s.bytes() {
-        unsafe {
-            asm!("out dx, al", in("dx") 0x3f8u16, in("al") b);
+pub extern "C" fn rust_main() -> ! {
+    let vga_buffer = 0xb8000 as *mut u8;
+    
+    // Generate a pseudo-random 8-digit PIN using the CPU's Time Stamp Counter
+    let tsc = unsafe { _rdtsc() };
+    // Mix the bits using a simple Linear Congruential Generator so it looks nicely random
+    let lcg = tsc.wrapping_mul(6364136223846793005).wrapping_add(1);
+    let mut pin = ((lcg >> 32) % 100000000) as u32;
+    
+    let mut pin_str = [b'0'; 9];
+    for i in (0..9).rev() {
+        if i == 4 {
+            pin_str[i] = b' ';
+        } else {
+            pin_str[i] = b'0' + (pin % 10) as u8;
+            pin /= 10;
         }
     }
-}
-
-#[no_mangle]
-pub extern "C" fn _start() -> ! {
-    serial_write("\r\n==========================================\r\n");
-    serial_write("  Silvae Bare-Metal Hypervisor Booted!    \r\n");
-    serial_write("  True Frontier (2f837bf7) Initialized.   \r\n");
-    serial_write("==========================================\r\n");
     
-    let vga_buffer = 0xb8000 as *mut u8;
-    let hello = b"Silvae Bare-Metal Hypervisor Booted!";
-    for (i, &byte) in hello.iter().enumerate() {
-        unsafe {
-            *vga_buffer.offset(i as isize * 2) = byte;
-            *vga_buffer.offset(i as isize * 2 + 1) = 0xa;
+    let mut lines = [
+        *b"================================================================================",
+        *b"                                                                                ",
+        *b"                               Welcome to Silvae!                               ",
+        *b"                                                                                ",
+        *b"================================================================================",
+        *b"                                                                                ",
+        *b"  Connected to $NETWORKID                                                       ",
+        *b"                                                                                ",
+        *b"  To claim this node, enter this pairing code on the Silvae app or at           ",
+        *b"  http://Silv.ae/start:                                                         ",
+        *b"                                                                                ",
+        *b"                                   1234 5678                                    ",
+        *b"                                                                                ",
+    ];
+    
+    // Inject the randomly generated PIN directly into the 11th line (index 11)
+    lines[11][35..44].copy_from_slice(&pin_str);
+
+    for (row, line) in lines.iter().enumerate() {
+        for (col, &byte) in line.iter().enumerate() {
+            unsafe {
+                *vga_buffer.offset((row * 80 + col) as isize * 2) = byte;
+                *vga_buffer.offset((row * 80 + col) as isize * 2 + 1) = 0x0a; // Light Green text
+            }
         }
     }
     
