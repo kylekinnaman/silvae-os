@@ -1,0 +1,10 @@
+[package]
+name = "silvae-os"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+members = ["builder"]
+
+[dependencies]
+bootloader_api = "0.11.4"
