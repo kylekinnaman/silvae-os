@@ -1,4 +1,4 @@
-#![cfg(not(tarpaulin))]
+#![cfg_attr(tarpaulin, tarpaulin::skip)]
 /// Realtek 8139 Bare-Metal Network Interface Controller (NIC) Driver.
 extern crate alloc;
 use alloc::vec::Vec;

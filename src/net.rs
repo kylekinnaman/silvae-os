@@ -1,4 +1,4 @@
-#![cfg(not(tarpaulin))]
+#![cfg_attr(tarpaulin, tarpaulin::skip)]
 /// Network layer mapping smoltcp endpoints to physical hardware frames.
 use alloc::collections::BTreeMap;
 use alloc::vec;

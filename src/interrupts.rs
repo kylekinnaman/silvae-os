@@ -1,4 +1,4 @@
-#![cfg(not(tarpaulin))]
+#![cfg_attr(tarpaulin, tarpaulin::skip)]
 /// Initializes CPU interrupts and hardware timers for the kernel.
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 use lazy_static::lazy_static;

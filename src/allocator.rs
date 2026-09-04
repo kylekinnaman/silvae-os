@@ -1,3 +1,4 @@
+#![cfg_attr(tarpaulin, tarpaulin::skip)]
 /// Kernel heap allocation mappings required for dynamic buffer generation.
 use linked_list_allocator::LockedHeap;
 use x86_64::VirtAddr;
