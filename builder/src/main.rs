@@ -1,3 +1,5 @@
+#![cfg(not(tarpaulin))]
+
 #![cfg_attr(tarpaulin, tarpaulin::skip)]
 use std::path::PathBuf;
 
