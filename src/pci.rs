@@ -1,4 +1,3 @@
-#![cfg_attr(tarpaulin, tarpaulin::skip)]
 /// Core PCI bus enumeration and configuration space parsing.
 use x86_64::instructions::port::Port;
 use alloc::vec::Vec;

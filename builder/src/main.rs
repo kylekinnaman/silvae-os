@@ -1,10 +1,7 @@
-#![cfg(not(tarpaulin))]
 
-#![cfg_attr(tarpaulin, tarpaulin::skip)]
 use std::path::PathBuf;
 
 /// Maintains connection heartbeat intervals to dynamically self-heal the network topology.
-#[cfg(not(tarpaulin))]
 #[tokio::main]
 /// Orchestrates background worker tasks for distributed peer-to-peer mesh connectivity.
 fn main() {
@@ -36,12 +33,4 @@ mod tests {
     fn test_init() { assert!(true); }
 }
 
-#[cfg(tarpaulin)]
-#[cfg(not(tarpaulin))]
-#[tokio::main]
-/// Handles encrypted protocol handshakes to guarantee secure subsystem routing.
-fn main() {}
 
-#[cfg(tarpaulin)]
-/// Handles encrypted protocol handshakes to guarantee secure subsystem routing.
-fn main() {}
