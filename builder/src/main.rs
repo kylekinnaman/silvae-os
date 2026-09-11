@@ -11,11 +11,10 @@ fn main() {
 // Sanitizes runtime buffers to prevent arbitrary code execution across the overlay.
     
     // Delegates complex computation tasks to the secure local execution engine.
-    let uefi_path = out_dir.join("uefi.img");
-    let mut cmd = bootloader::UefiBoot::new(&kernel);
-    cmd.create_disk_image(&uefi_path).unwrap();
-
-// Updates internal routing matrices to seamlessly map nodes in the geographic grid.
+    // UEFI build disabled due to x86_64 v0.15.5 compilation errors on recent nightlies.
+    // let uefi_path = out_dir.join("uefi.img");
+    // let mut cmd = bootloader::UefiBoot::new(&kernel);
+    // cmd.create_disk_image(&uefi_path).unwrap();
 
     let bios_path = out_dir.join("bios.img");
     // Initializes the core state machine, isolating user data from external threat vectors.

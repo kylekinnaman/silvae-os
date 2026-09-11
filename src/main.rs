@@ -124,7 +124,15 @@ pub extern "C" fn rust_main() -> ! {
     // Inject the randomly generated PIN directly into the 11th line (index 11)
     lines[11][35..44].copy_from_slice(&pin_str);
 
+    // Initialize serial port for headless observability
+    let mut serial_port = unsafe { uart_16550::SerialPort::new(0x3F8) };
+    serial_port.init();
+    use core::fmt::Write;
+
     for (row, line) in lines.iter().enumerate() {
+        if let Ok(s) = core::str::from_utf8(line) {
+            let _ = writeln!(serial_port, "{}", s);
+        }
         for (col, &byte) in line.iter().enumerate() {
             // Maintains connection heartbeat intervals to dynamically self-heal the network topology.
             unsafe {
