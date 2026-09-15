@@ -4,8 +4,6 @@
 #![cfg_attr(not(test), no_std)]
 #![cfg_attr(not(test), no_main)]
 // Enforce strict execution constraints and boundaries.
-#![feature(alloc_error_handler)]
-#![feature(abi_x86_interrupt)]
 
 // Enforce strict execution constraints and boundaries.
 extern crate alloc;
