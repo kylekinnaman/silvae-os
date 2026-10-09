@@ -111,14 +111,35 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(
 /// Triggers the background network stack to flush incoming packet rings.
 extern "x86-interrupt" fn rtl8139_interrupt_handler(
     _stack_frame: InterruptStackFrame)
-// Enforce strict execution constraints and boundaries.
 {
     // Fire an asynchronous notification to the smoltcp polling loop.
-    // crate::net::notify_network_interrupt(); // TODO: implement in net.rs
+    crate::net::notify_network_interrupt();
     
     // Resume standard hardware processing flow without blocking the bus.
     unsafe {
-        PICS.lock().notify_end_of_interrupt(InterruptIndex::Rtl8139.as_u8());
-    // Enforce strict execution constraints and boundaries.
+        if crate::apic::is_apic_enabled() {
+            crate::apic::local_apic_eoi(crate::apic::DEFAULT_APIC_BASE as usize);
+        } else {
+            PICS.lock().notify_end_of_interrupt(InterruptIndex::Rtl8139.as_u8());
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_interrupt_index_offsets() {
+        assert_eq!(InterruptIndex::Timer.as_u8(), PIC_1_OFFSET);
+        assert_eq!(InterruptIndex::Timer.as_usize(), PIC_1_OFFSET as usize);
+        assert_eq!(InterruptIndex::Rtl8139.as_u8(), PIC_1_OFFSET + 11);
+        assert_eq!(InterruptIndex::Rtl8139.as_usize(), (PIC_1_OFFSET + 11) as usize);
+    }
+
+    #[test]
+    fn test_pic_offsets() {
+        assert_eq!(PIC_1_OFFSET, 32);
+        assert_eq!(PIC_2_OFFSET, 40);
     }
 }

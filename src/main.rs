@@ -3,20 +3,19 @@
 
 #![cfg_attr(not(test), no_std)]
 #![cfg_attr(not(test), no_main)]
+#![feature(abi_x86_interrupt)]
 // Enforce strict execution constraints and boundaries.
 
 // Enforce strict execution constraints and boundaries.
 extern crate alloc;
 
 pub mod interrupts;
-// Enforce strict execution constraints and boundaries.
 pub mod pci;
-// Enforce strict execution constraints and boundaries.
 pub mod rtl8139;
-// Enforce strict execution constraints and boundaries.
 pub mod net;
-// Enforce strict execution constraints and boundaries.
 pub mod allocator;
+pub mod apic;
+pub mod dma;
 
 use core::panic::PanicInfo;
 use core::arch::asm;
@@ -52,19 +51,24 @@ pub extern "C" fn rust_main() -> ! {
     // Enforce strict execution constraints and boundaries.
     x86_64::instructions::interrupts::enable();
     
-    // Discover the RTL8139 NIC on the PCI bus and inject it into the network subsystem.
+    // Discover PCI hardware devices and match supported network drivers.
     let devices = crate::pci::enumerate_pci();
-    for dev in devices {
-        // Enforce strict execution constraints and boundaries.
-        if dev.vendor_id == 0x10EC && dev.device_id == 0x8139 {
-            let io_base = (dev.read_bar(0) & !3) as u16;
-            // Enforce strict execution constraints and boundaries.
-            let nic = crate::rtl8139::Rtl8139::new(io_base);
-            *crate::rtl8139::RTL8139_NIC.lock() = Some(nic);
-            crate::net::init_network();
-            // Enforce strict execution constraints and boundaries.
-            break;
-        // Enforce strict execution constraints and boundaries.
+    let network_adapters = crate::pci::find_network_adapters(&devices);
+    for (dev, driver) in network_adapters {
+        // Enable PCI Bus Mastering so the NIC can perform Direct Memory Access (DMA).
+        dev.enable_bus_mastering();
+
+        match driver {
+            crate::pci::NetworkDriver::Realtek8139 => {
+                let io_base = (dev.read_bar(0) & !3) as u16;
+                let nic = crate::rtl8139::Rtl8139::new(io_base);
+                *crate::rtl8139::RTL8139_NIC.lock() = Some(nic);
+                crate::net::init_network();
+                break;
+            }
+            crate::pci::NetworkDriver::IntelE1000 | crate::pci::NetworkDriver::VirtIoNet => {
+                // Network controller detected on PCI bus.
+            }
         }
     }
     
@@ -593,6 +597,124 @@ mod tests {
         // Copy the target string into the hardcoded matrix limits.
         lines[11][35..44].copy_from_slice(&pin_str);
     }
-// Enforce strict execution constraints and boundaries.
+
+    /// Verifies Activity 1: Interrupts and APIC configuration mappings.
+    #[test]
+    fn test_activity1_interrupts_and_apic() {
+        use crate::interrupts::{InterruptIndex, PIC_1_OFFSET, PIC_2_OFFSET};
+        use crate::apic::{ApicInfo, IoApicRedirectionEntry, DEFAULT_APIC_BASE};
+
+        // Assert PIC IRQ offset boundaries
+        assert_eq!(InterruptIndex::Timer.as_u8(), PIC_1_OFFSET);
+        assert_eq!(InterruptIndex::Rtl8139.as_u8(), PIC_1_OFFSET + 11);
+        assert_eq!(PIC_2_OFFSET, PIC_1_OFFSET + 8);
+
+        // Assert APIC feature detection decoding
+        let edx_features = 1 << 9; // APIC on-chip
+        let ecx_features = 1 << 21; // x2APIC
+        let msr_apic = (1 << 11) | DEFAULT_APIC_BASE; // Enabled in MSR
+        let apic_info = ApicInfo::detect_from_features(edx_features, ecx_features, msr_apic);
+        assert!(apic_info.has_local_apic);
+        assert!(apic_info.has_x2apic);
+        assert!(apic_info.is_globally_enabled);
+        assert_eq!(apic_info.base_address, DEFAULT_APIC_BASE);
+
+        // Assert IO-APIC redirection entry routing for network card
+        let net_irq_entry = IoApicRedirectionEntry::new_standard(InterruptIndex::Rtl8139.as_u8(), 0);
+        assert_eq!(net_irq_entry.vector, PIC_1_OFFSET + 11);
+        assert!(!net_irq_entry.masked);
+
+        // Assert network interrupt flag notifications
+        crate::net::notify_network_interrupt();
+        assert!(crate::net::consume_network_interrupt());
+        assert!(!crate::net::consume_network_interrupt());
+    }
+
+    /// Verifies Activity 2: Dynamic Memory Management, Heap Boundaries, and DMA Ring Buffers.
+    #[test]
+    fn test_activity2_dma_and_allocator() {
+        use crate::allocator::{heap_size, heap_start, heap_end, HEAP_SIZE};
+        use crate::dma::{DmaBuffer, DmaRingBuffer, DMA_ALIGNMENT};
+
+        // Validate heap boundary constraints
+        assert_eq!(heap_size(), HEAP_SIZE);
+        assert_eq!(heap_end(), heap_start() + heap_size());
+        assert!(heap_size() >= 256 * 1024);
+
+        // Validate DMA buffer alignment guarantees (64-byte alignment)
+        let dma_buf = DmaBuffer::<512>::new();
+        let addr = dma_buf.physical_address() as usize;
+        assert_eq!(addr % DMA_ALIGNMENT, 0);
+
+        // Validate DMA Ring Buffer packet lifecycle
+        let mut dma_ring = DmaRingBuffer::<2048>::new();
+        let payload = b"SILVAE-ETHERNET-FRAME-PACKET";
+        let next_offset = dma_ring.write_hardware_packet(0, 0x0001, payload).expect("write failed");
+        assert!(next_offset > 0);
+
+        let packet = dma_ring.read_packet().expect("packet must be present");
+        assert_eq!(packet.status, 0x0001);
+        assert_eq!(packet.length, payload.len());
+        assert_eq!(packet.data.as_slice(), payload);
+        assert_eq!(dma_ring.packets_read_count(), 1);
+    }
+
+    /// Verifies Activity 3: PCI Bus Enumeration, Network Driver Matching, and Bus Mastering.
+    #[test]
+    fn test_activity3_pci_driver_matching() {
+        use crate::pci::{
+            find_network_adapters, NetworkDriver, PciDevice,
+            PCI_CLASS_NETWORK, PCI_SUBCLASS_ETHERNET,
+            PCI_CMD_BUS_MASTER, PCI_CMD_IO_SPACE, PCI_CMD_MEMORY_SPACE,
+        };
+
+        // Realtek RTL8139
+        let rtl_dev = PciDevice {
+            bus: 0,
+            slot: 3,
+            function: 0,
+            vendor_id: 0x10EC,
+            device_id: 0x8139,
+            class: PCI_CLASS_NETWORK,
+            subclass: PCI_SUBCLASS_ETHERNET,
+        };
+        assert_eq!(rtl_dev.match_network_driver(), Some(NetworkDriver::Realtek8139));
+
+        // Intel e1000 Gigabit
+        let intel_dev = PciDevice {
+            bus: 0,
+            slot: 4,
+            function: 0,
+            vendor_id: 0x8086,
+            device_id: 0x100E,
+            class: PCI_CLASS_NETWORK,
+            subclass: PCI_SUBCLASS_ETHERNET,
+        };
+        assert_eq!(intel_dev.match_network_driver(), Some(NetworkDriver::IntelE1000));
+
+        // VirtIO Net
+        let virtio_dev = PciDevice {
+            bus: 0,
+            slot: 5,
+            function: 0,
+            vendor_id: 0x1AF4,
+            device_id: 0x1000,
+            class: PCI_CLASS_NETWORK,
+            subclass: PCI_SUBCLASS_ETHERNET,
+        };
+        assert_eq!(virtio_dev.match_network_driver(), Some(NetworkDriver::VirtIoNet));
+
+        // Filter network adapters from PCI list
+        let devices = alloc::vec![rtl_dev, intel_dev, virtio_dev];
+        let matched = find_network_adapters(&devices);
+        assert_eq!(matched.len(), 3);
+        assert_eq!(matched[0].1, NetworkDriver::Realtek8139);
+        assert_eq!(matched[1].1, NetworkDriver::IntelE1000);
+        assert_eq!(matched[2].1, NetworkDriver::VirtIoNet);
+
+        // Verify PCI Bus Mastering bit flags
+        let required_cmd_flags = PCI_CMD_IO_SPACE | PCI_CMD_MEMORY_SPACE | PCI_CMD_BUS_MASTER;
+        assert_eq!(required_cmd_flags, 0x0007);
+    }
 }
 

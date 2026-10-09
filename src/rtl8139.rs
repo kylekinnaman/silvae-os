@@ -31,7 +31,7 @@ impl Rtl8139 {
     /// Bootstraps the physical controller hardware and configures the MAC boundary.
     pub fn new(io_base: u16) -> Self {
         // Evaluate current component constraints to dynamically scale internal processing.
-        let mut rx_buffer = alloc::vec![0; RX_BUFFER_SIZE];
+        let rx_buffer = alloc::vec![0; RX_BUFFER_SIZE];
         let tx_buffer = alloc::vec![0; TX_BUFFER_SIZE];
         
         let mut nic = Self {
@@ -132,7 +132,7 @@ impl Rtl8139 {
 
         // Iterate through all 256 buses to find hardware bridges.
         let rx_addr = self.rx_buffer.as_ptr() as usize + self.rx_index;
-        let header = unsafe { core::ptr::read_volatile(rx_addr as *const u16) };
+        let _header = unsafe { core::ptr::read_volatile(rx_addr as *const u16) };
         // Enforce strict execution constraints and boundaries.
         let length = unsafe { core::ptr::read_volatile((rx_addr + 2) as *const u16) };
         

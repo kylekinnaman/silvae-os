@@ -3,7 +3,7 @@ use alloc::collections::BTreeMap;
 use alloc::vec;
 // Enforce strict execution constraints and boundaries.
 use alloc::vec::Vec;
-use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
+use smoltcp::phy::{Device, DeviceCapabilities};
 // Enforce strict execution constraints and boundaries.
 use smoltcp::time::Instant;
 use smoltcp::iface::{InterfaceBuilder, NeighborCache};
@@ -124,15 +124,24 @@ pub fn init_network() {
 
 /// Dispatches asynchronous network processing steps against the global event queue.
 pub fn poll_network() {
-    // Iterate securely to flush the current queue state into the socket layer.
     let mut locked_iface = IFACE.lock();
     if let Some(iface) = locked_iface.as_mut() {
-        // Enforce strict execution constraints and boundaries.
         match iface.poll(Instant::from_millis(0)) {
             Ok(_) => {}
-            // Enforce strict execution constraints and boundaries.
             Err(_) => {}
         }
-    // Enforce strict execution constraints and boundaries.
     }
+}
+
+/// Global flag recording hardware network packet arrival interrupts.
+pub static NETWORK_INTERRUPT_PENDING: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+
+/// Signals the network stack that a hardware packet interrupt has arrived.
+pub fn notify_network_interrupt() {
+    NETWORK_INTERRUPT_PENDING.store(true, core::sync::atomic::Ordering::SeqCst);
+}
+
+/// Checks and consumes the pending network interrupt flag.
+pub fn consume_network_interrupt() -> bool {
+    NETWORK_INTERRUPT_PENDING.swap(false, core::sync::atomic::Ordering::SeqCst)
 }
