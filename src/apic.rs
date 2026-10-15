@@ -154,8 +154,8 @@ pub fn local_apic_eoi(apic_base: usize) {
 
 /// Disables the legacy 8259 PIC controllers by masking all IRQs.
 pub unsafe fn disable_legacy_pic() {
-    let mut master_data = x86_64::instructions::port::Port::<u8>::new(PIC_MASTER_DATA);
-    let mut slave_data = x86_64::instructions::port::Port::<u8>::new(PIC_SLAVE_DATA);
+    let mut master_data = crate::port::IoPort::<u8>::new(PIC_MASTER_DATA);
+    let mut slave_data = crate::port::IoPort::<u8>::new(PIC_SLAVE_DATA);
     master_data.write(0xFF);
     slave_data.write(0xFF);
 }
@@ -245,6 +245,7 @@ impl IoApicRedirectionEntry {
 mod tests {
     use super::*;
 
+    /// Tests APIC feature flag detection and MSR base address parsing.
     #[test]
     fn test_apic_detection_logic() {
         let edx_has_apic = 1 << 9;
@@ -258,6 +259,7 @@ mod tests {
         assert_eq!(info.base_address, 0xFEE0_0000);
     }
 
+    /// Tests APIC fallback to standard physical base address when disabled.
     #[test]
     fn test_apic_fallback_base_address() {
         let edx_has_apic = 1 << 9;
@@ -268,6 +270,7 @@ mod tests {
         assert_eq!(info.base_address, DEFAULT_APIC_BASE);
     }
 
+    /// Tests encoding and decoding roundtrip for I/O APIC redirection entries.
     #[test]
     fn test_ioapic_redirection_encoding_decoding() {
         let entry = IoApicRedirectionEntry {
@@ -292,6 +295,7 @@ mod tests {
         assert_eq!(decoded.destination_id, 3);
     }
 
+    /// Tests default bitfield states for masked I/O APIC redirection table entries.
     #[test]
     fn test_ioapic_masked_entry() {
         let entry = IoApicRedirectionEntry::new_masked(0x20);
@@ -300,6 +304,7 @@ mod tests {
         assert_eq!((low & 0xFF) as u8, 0x20);
     }
 
+    /// Tests global APIC status flag updates and query states.
     #[test]
     fn test_apic_flag_state() {
         set_apic_enabled(false);
@@ -307,5 +312,55 @@ mod tests {
         set_apic_enabled(true);
         assert!(is_apic_enabled());
         set_apic_enabled(false);
+    }
+
+    /// Tests memory-mapped Local APIC register read, write, enable, and EOI operations.
+    #[test]
+    fn test_local_apic_operations() {
+        let mut apic_mem = [0u32; 1024];
+        let base = apic_mem.as_mut_ptr() as usize;
+        let apic = LocalApic::new(base);
+
+        unsafe {
+            apic.enable();
+            assert!(is_apic_enabled());
+            assert_eq!(apic.read_reg(APIC_REG_TPR), 0);
+            assert_eq!(apic.read_reg(APIC_REG_SVR), APIC_SVR_SOFTWARE_ENABLE | APIC_SPURIOUS_VECTOR);
+
+            // Populate target hardware version and ID fields in memory
+            apic_mem[APIC_REG_VERSION / 4] = 0x14;
+            assert_eq!(apic.version(), 0x14);
+
+            apic_mem[APIC_REG_ID / 4] = 0x05 << 24;
+            assert_eq!(apic.id(), 0x05);
+
+            apic.send_eoi();
+            assert_eq!(apic_mem[APIC_REG_EOI / 4], 0);
+
+            local_apic_eoi(base);
+            assert_eq!(apic_mem[APIC_REG_EOI / 4], 0);
+        }
+        set_apic_enabled(false);
+    }
+
+    /// Tests standard unmasked edge-triggered redirection table entry creation.
+    #[test]
+    fn test_ioapic_standard_entry() {
+        let entry = IoApicRedirectionEntry::new_standard(43, 2);
+        assert_eq!(entry.vector, 43);
+        assert_eq!(entry.destination_id, 2);
+        assert!(!entry.masked);
+        assert_eq!(entry.delivery_mode, 0);
+        assert!(!entry.destination_mode);
+        assert!(!entry.polarity_low);
+        assert!(!entry.trigger_level);
+    }
+
+    /// Tests legacy PIC masking operation.
+    #[test]
+    fn test_disable_legacy_pic() {
+        unsafe {
+            disable_legacy_pic();
+        }
     }
 }

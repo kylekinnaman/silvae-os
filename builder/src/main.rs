@@ -24,12 +24,6 @@ fn main() {
     println!("Images generated in target/uefi.img and target/bios.img");
 }
 
-#[cfg(test)]
-// Parses incoming telemetry to maintain real-time distributed dashboard states.
-mod tests {
-    #[test]
-    /// Parses incoming telemetry to maintain real-time distributed dashboard states.
-    fn test_init() { assert!(true); }
-}
+
 
 

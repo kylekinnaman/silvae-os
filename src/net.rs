@@ -145,3 +145,110 @@ pub fn notify_network_interrupt() {
 pub fn consume_network_interrupt() -> bool {
     NETWORK_INTERRUPT_PENDING.swap(false, core::sync::atomic::Ordering::SeqCst)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use smoltcp::phy::{Device, RxToken, TxToken};
+
+    /// Tests hardware capabilities configuration for the Realtek network device.
+    #[test]
+    fn test_rtl8139_device_capabilities() {
+        let dev = Rtl8139Device;
+        let caps = dev.capabilities();
+        assert_eq!(caps.max_transmission_unit, 1500);
+    }
+
+    /// Tests packet transmission token generation.
+    #[test]
+    fn test_rtl8139_device_transmit() {
+        let mut dev = Rtl8139Device;
+        assert!(dev.transmit().is_some());
+    }
+
+    /// Tests packet reception fallback when hardware controller is uninitialized.
+    #[test]
+    fn test_rtl8139_device_receive_without_nic() {
+        let mut dev = Rtl8139Device;
+        assert!(dev.receive().is_none());
+    }
+
+    /// Tests reception token buffer consumption and mutation in smoltcp closures.
+    #[test]
+    fn test_rtl8139_rx_token_consume() {
+        let token = Rtl8139RxToken(alloc::vec![10, 20, 30, 40]);
+        let res = token.consume(Instant::from_millis(0), |buf| {
+            assert_eq!(buf.len(), 4);
+            buf[0] = 99;
+            Ok(buf[0])
+        });
+        assert_eq!(res, Ok(99));
+    }
+
+    /// Tests transmission token buffer allocation and data consumption.
+    #[test]
+    fn test_rtl8139_tx_token_consume() {
+        let token = Rtl8139TxToken;
+        let res = token.consume(Instant::from_millis(0), 12, |buf| {
+            assert_eq!(buf.len(), 12);
+            buf.copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+            Ok(buf.len())
+        });
+        assert_eq!(res, Ok(12));
+    }
+
+    /// Tests network hardware interrupt notification and atomic consumption.
+    #[test]
+    fn test_network_interrupt_flags() {
+        NETWORK_INTERRUPT_PENDING.store(false, core::sync::atomic::Ordering::SeqCst);
+        assert!(!consume_network_interrupt());
+        notify_network_interrupt();
+        assert!(consume_network_interrupt());
+        assert!(!consume_network_interrupt());
+    }
+
+    /// Tests smoltcp network interface initialization and poll dispatching.
+    #[test]
+    fn test_init_and_poll_network() {
+        init_network();
+        assert!(IFACE.lock().is_some());
+        poll_network();
+    }
+
+    /// Tests packet reception and transmission when hardware NIC is active.
+    #[test]
+    fn test_rtl8139_device_with_active_nic() {
+        crate::port::reset_hardware_bus();
+        let mut nic = crate::rtl8139::Rtl8139::new(0xC000);
+        unsafe {
+            let mut cr = crate::port::IoPort::<u8>::new(0xC000 + 0x37);
+            cr.write(0x00);
+        }
+
+        *RTL8139_NIC.lock() = Some(nic);
+
+        // Put packet in the locked nic directly
+        {
+            let mut locked = RTL8139_NIC.lock();
+            let n = locked.as_mut().unwrap();
+            let i = n.receive(); // clears empty or invalid
+            let _ = i;
+        }
+
+        // Test receive on device
+        let mut dev = Rtl8139Device;
+        let _ = dev.receive();
+
+        // Test transmit with NIC active
+        let token = Rtl8139TxToken;
+        let res = token.consume(Instant::from_millis(0), 8, |buf| {
+            buf.copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
+            Ok(buf.len())
+        });
+        assert_eq!(res, Ok(8));
+
+        *RTL8139_NIC.lock() = None;
+        crate::port::reset_hardware_bus();
+    }
+}
+

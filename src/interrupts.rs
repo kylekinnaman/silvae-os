@@ -129,6 +129,7 @@ extern "x86-interrupt" fn rtl8139_interrupt_handler(
 mod tests {
     use super::*;
 
+    /// Tests interrupt index mapping to hardware PIC offsets.
     #[test]
     fn test_interrupt_index_offsets() {
         assert_eq!(InterruptIndex::Timer.as_u8(), PIC_1_OFFSET);
@@ -137,9 +138,26 @@ mod tests {
         assert_eq!(InterruptIndex::Rtl8139.as_usize(), (PIC_1_OFFSET + 11) as usize);
     }
 
+    /// Tests master and slave PIC base vector offset constants.
     #[test]
     fn test_pic_offsets() {
         assert_eq!(PIC_1_OFFSET, 32);
         assert_eq!(PIC_2_OFFSET, 40);
+    }
+
+    /// Tests IDT lazy-static table initialization and handler registration.
+    #[test]
+    fn test_idt_initialization() {
+        let idt = &*IDT;
+        assert!(idt[InterruptIndex::Timer.as_usize()].handler_addr().as_u64() != 0);
+        assert!(idt[InterruptIndex::Keyboard.as_usize()].handler_addr().as_u64() != 0);
+        assert!(idt[InterruptIndex::Rtl8139.as_usize()].handler_addr().as_u64() != 0);
+    }
+
+    /// Tests keyboard interrupt index conversion.
+    #[test]
+    fn test_keyboard_interrupt_index() {
+        assert_eq!(InterruptIndex::Keyboard.as_u8(), PIC_1_OFFSET + 1);
+        assert_eq!(InterruptIndex::Keyboard.as_usize(), (PIC_1_OFFSET + 1) as usize);
     }
 }

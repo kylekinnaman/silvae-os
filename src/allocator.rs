@@ -41,6 +41,7 @@ pub fn init_heap() {
 mod tests {
     use super::*;
 
+    /// Tests static heap size and address layout boundary constants.
     #[test]
     fn test_heap_constants() {
         assert_eq!(heap_size(), 256 * 1024);
@@ -48,6 +49,7 @@ mod tests {
         assert_eq!(heap_end(), 0x4444_4444_0000 + 256 * 1024);
     }
 
+    /// Tests mathematical consistency between heap start, end, and size limits.
     #[test]
     fn test_heap_bounds_validity() {
         assert!(heap_end() > heap_start());

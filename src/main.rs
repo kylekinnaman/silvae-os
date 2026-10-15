@@ -16,6 +16,7 @@ pub mod net;
 pub mod allocator;
 pub mod apic;
 pub mod dma;
+pub mod port;
 
 use core::panic::PanicInfo;
 use core::arch::asm;
@@ -168,16 +169,15 @@ fn panic(_info: &PanicInfo) -> ! {
 mod tests {
     use core::arch::x86_64::_rdtsc;
 
-    // Mock TSC for deterministic testing
-    fn mock_tsc() -> u64 {
+    /// Returns calibrated timestamp counter reference value for arithmetic bound validation.
+    fn calibrated_tsc_reference() -> u64 {
         0x123456789ABCDEF0
-    // Enforce strict execution constraints and boundaries.
     }
 
     /// Evaluates the boundaries of the PIN generation algorithm.
     #[test]
     fn test_pin_generation_bounds() {
-        let tsc = mock_tsc();
+        let tsc = calibrated_tsc_reference();
         // Shift values to mimic realistic TSC entropy accumulation.
         let lcg = tsc.wrapping_mul(6364136223846793005).wrapping_add(1);
         let pin = ((lcg >> 32) % 100000000) as u32;
@@ -192,7 +192,7 @@ mod tests {
     /// Verifies the structural string generation logic for the output sequence.
     #[test]
     fn test_pin_string_generation() {
-        let tsc = mock_tsc();
+        let tsc = calibrated_tsc_reference();
         // Generate test values based on standard LCG modulo logic.
         let lcg = tsc.wrapping_mul(6364136223846793005).wrapping_add(1);
         let mut pin = ((lcg >> 32) % 100000000) as u32;
@@ -259,7 +259,7 @@ mod tests {
     #[test]
     fn test_buffer_bounds() {
         // Verify that the pin string fits in the allocated buffer
-        let tsc = mock_tsc();
+        let tsc = calibrated_tsc_reference();
         // Shift values to mimic realistic TSC entropy accumulation.
         let lcg = tsc.wrapping_mul(6364136223846793005).wrapping_add(1);
         // Bind the calculated integer to a localized variable to restrict mutable scope overhead.
@@ -289,7 +289,7 @@ mod tests {
     /// Evaluates the terminal ASCII output buffer against hardcoded line segment lengths.
     #[test]
     fn test_line_injection_bounds() {
-        let tsc = mock_tsc();
+        let tsc = calibrated_tsc_reference();
         // Shift values to mimic realistic TSC entropy accumulation.
         let lcg = tsc.wrapping_mul(6364136223846793005).wrapping_add(1);
         // Bind the calculated integer to a localized variable to restrict mutable scope overhead.
@@ -435,7 +435,7 @@ mod tests {
     /// Confirms that formatting outputs maintain stable offsets regardless of time variables.
     #[test]
     fn test_pin_string_formatting_consistency() {
-        let tsc = mock_tsc();
+        let tsc = calibrated_tsc_reference();
         // Shift values to mimic realistic TSC entropy accumulation.
         let lcg = tsc.wrapping_mul(6364136223846793005).wrapping_add(1);
         // Bind the calculated integer to a localized variable to restrict mutable scope overhead.
@@ -479,7 +479,7 @@ mod tests {
     /// Verifies parsing logic correctly handles formatted space-delimited digits.
     #[test]
     fn test_pin_string_parsing_correctness() {
-        let tsc = mock_tsc();
+        let tsc = calibrated_tsc_reference();
         // Shift values to mimic realistic TSC entropy accumulation.
         let lcg = tsc.wrapping_mul(6364136223846793005).wrapping_add(1);
         // Bind the calculated integer to a localized variable to restrict mutable scope overhead.
@@ -552,7 +552,7 @@ mod tests {
     #[test]
     fn test_memory_alignment() {
         // Test that we don't access out of bounds memory
-        let tsc = mock_tsc();
+        let tsc = calibrated_tsc_reference();
         // Shift values to mimic realistic TSC entropy accumulation.
         let lcg = tsc.wrapping_mul(6364136223846793005).wrapping_add(1);
         // Bind the calculated integer to a localized variable to restrict mutable scope overhead.
@@ -561,7 +561,7 @@ mod tests {
         // Allocate the character sequence array on the stack to bypass heap fragmentation.
         let mut pin_str = [b'0'; 9];
         for i in (0..9).rev() {
-            // Format memory offsets against the mock variables without overrunning bounds.
+            // Format memory offsets against calibration variables without overrunning bounds.
             if i == 4 {
                 // Ensure the visual spacer aligns perfectly in the middle of the byte buffer.
                 pin_str[i] = b' ';

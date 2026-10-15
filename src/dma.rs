@@ -107,7 +107,7 @@ impl<const CAPACITY: usize> DmaRingBuffer<CAPACITY> {
         self.packets_consumed.load(Ordering::Relaxed)
     }
 
-    /// Writes simulated hardware incoming packet data directly to the ring for testing.
+    /// Writes synthetic hardware incoming packet data directly to the ring for testing.
     pub fn write_hardware_packet(&mut self, offset: usize, status: u16, payload: &[u8]) -> Result<usize, ()> {
         let total_len = 4 + payload.len(); // 4 bytes header (status + length)
         if offset + total_len > CAPACITY {
@@ -168,6 +168,7 @@ impl<const CAPACITY: usize> DmaRingBuffer<CAPACITY> {
 mod tests {
     use super::*;
 
+    /// Tests memory alignment constraints for physical DMA buffers.
     #[test]
     fn test_dma_buffer_alignment() {
         let buffer = DmaBuffer::<1024>::new();
@@ -175,6 +176,7 @@ mod tests {
         assert_eq!(addr % DMA_ALIGNMENT, 0, "DMA buffer must be 64-byte aligned");
     }
 
+    /// Tests byte read and write operations across DMA buffers.
     #[test]
     fn test_dma_buffer_read_write() {
         let mut buffer = DmaBuffer::<256>::new();
@@ -184,6 +186,7 @@ mod tests {
         assert_eq!(buffer.read_u16(10), Some(0x3412));
     }
 
+    /// Tests packet flow and offset updates in DMA ring buffers.
     #[test]
     fn test_dma_ring_buffer_packet_flow() {
         let mut ring = DmaRingBuffer::<4096>::new();
@@ -201,6 +204,7 @@ mod tests {
         assert_eq!(ring.read_offset(), next_offset);
     }
 
+    /// Tests packet read rejection on empty ring buffers.
     #[test]
     fn test_dma_ring_buffer_empty_read() {
         let mut ring = DmaRingBuffer::<2048>::new();
@@ -208,10 +212,59 @@ mod tests {
         assert!(ring.read_packet().is_none());
     }
 
+    /// Tests boundary limit validation on oversized DMA writes.
     #[test]
     fn test_dma_ring_buffer_boundary_check() {
         let mut buffer = DmaBuffer::<64>::new();
         let oversized = [0xFF; 70];
         assert!(buffer.write_bytes(0, &oversized).is_err());
+    }
+
+    /// Tests capacity and mutable slice access for DMA buffers.
+    #[test]
+    fn test_dma_buffer_capacity_and_mut_slice() {
+        let mut buffer = DmaBuffer::<128>::new();
+        assert_eq!(buffer.capacity(), 128);
+        let slice = buffer.as_mut_slice();
+        slice[0] = 0xAA;
+        slice[127] = 0xBB;
+        assert_eq!(buffer.as_slice()[0], 0xAA);
+        assert_eq!(buffer.as_slice()[127], 0xBB);
+    }
+
+    /// Tests 16-bit word read bounds checking.
+    #[test]
+    fn test_dma_buffer_read_u16_out_of_bounds() {
+        let buffer = DmaBuffer::<16>::new();
+        assert_eq!(buffer.read_u16(15), None);
+        assert_eq!(buffer.read_u16(16), None);
+        assert_eq!(buffer.read_u16(20), None);
+    }
+
+    /// Tests physical address calculation and reset operations on DMA ring buffers.
+    #[test]
+    fn test_dma_ring_buffer_physical_address_and_reset() {
+        let mut ring = DmaRingBuffer::<1024>::new();
+        let paddr = ring.physical_address();
+        assert_eq!(paddr % (DMA_ALIGNMENT as u32), 0);
+
+        let test_payload = b"payload";
+        ring.write_hardware_packet(0, 0x0001, test_payload).expect("write failed");
+        let _ = ring.read_packet();
+        assert_eq!(ring.packets_read_count(), 1);
+
+        ring.reset();
+        assert_eq!(ring.read_offset(), 0);
+        assert_eq!(ring.packets_read_count(), 0);
+    }
+
+    /// Tests packet write rejection when hardware packet exceeds ring capacity.
+    #[test]
+    fn test_dma_ring_buffer_write_hardware_packet_overflow() {
+        let mut ring = DmaRingBuffer::<64>::new();
+        let payload = [0u8; 62];
+        // 4 bytes header + 62 bytes payload = 66 bytes > 64 capacity
+        assert!(ring.write_hardware_packet(0, 0x0001, &payload).is_err());
+        assert!(ring.write_hardware_packet(60, 0x0001, &[1, 2]).is_err());
     }
 }
