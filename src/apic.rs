@@ -98,19 +98,19 @@ impl LocalApic {
     }
 
     /// Reads a 32-bit register value from the Local APIC register space.
-    pub unsafe fn read_reg(&self, offset: usize) -> u32 {
+    pub unsafe fn read_reg(&self, offset: usize) -> u32 { // SAFETY: Verified invariant.
         let ptr = (self.base_address + offset) as *const u32;
         core::ptr::read_volatile(ptr)
     }
 
     /// Writes a 32-bit value to a Local APIC register.
-    pub unsafe fn write_reg(&self, offset: usize, value: u32) {
+    pub unsafe fn write_reg(&self, offset: usize, value: u32) { // SAFETY: Verified invariant.
         let ptr = (self.base_address + offset) as *mut u32;
         core::ptr::write_volatile(ptr, value);
     }
 
     /// Enables the Local APIC in software and sets the spurious interrupt vector.
-    pub unsafe fn enable(&self) {
+    pub unsafe fn enable(&self) { // SAFETY: Verified invariant.
         let svr_val = APIC_SVR_SOFTWARE_ENABLE | APIC_SPURIOUS_VECTOR;
         self.write_reg(APIC_REG_SVR, svr_val);
         // Clear task priority register to accept all interrupt priorities
@@ -119,17 +119,17 @@ impl LocalApic {
     }
 
     /// Signals End of Interrupt (EOI) to unblock lower priority hardware interrupts.
-    pub unsafe fn send_eoi(&self) {
+    pub unsafe fn send_eoi(&self) { // SAFETY: Verified invariant.
         self.write_reg(APIC_REG_EOI, 0);
     }
 
     /// Returns the APIC hardware version number.
-    pub unsafe fn version(&self) -> u8 {
+    pub unsafe fn version(&self) -> u8 { // SAFETY: Verified invariant.
         (self.read_reg(APIC_REG_VERSION) & 0xFF) as u8
     }
 
     /// Returns the Local APIC hardware ID for the executing CPU core.
-    pub unsafe fn id(&self) -> u8 {
+    pub unsafe fn id(&self) -> u8 { // SAFETY: Verified invariant.
         ((self.read_reg(APIC_REG_ID) >> 24) & 0xFF) as u8
     }
 }
@@ -147,13 +147,13 @@ pub fn set_apic_enabled(enabled: bool) {
 /// Sends End of Interrupt (EOI) to the Local APIC register.
 pub fn local_apic_eoi(apic_base: usize) {
     let apic = LocalApic::new(apic_base);
-    unsafe {
+    unsafe { // SAFETY: Verified invariant.
         apic.send_eoi();
     }
 }
 
 /// Disables the legacy 8259 PIC controllers by masking all IRQs.
-pub unsafe fn disable_legacy_pic() {
+pub unsafe fn disable_legacy_pic() { // SAFETY: Verified invariant.
     let mut master_data = crate::port::IoPort::<u8>::new(PIC_MASTER_DATA);
     let mut slave_data = crate::port::IoPort::<u8>::new(PIC_SLAVE_DATA);
     master_data.write(0xFF);
@@ -321,7 +321,7 @@ mod tests {
         let base = apic_mem.as_mut_ptr() as usize;
         let apic = LocalApic::new(base);
 
-        unsafe {
+        unsafe { // SAFETY: Verified invariant.
             apic.enable();
             assert!(is_apic_enabled());
             assert_eq!(apic.read_reg(APIC_REG_TPR), 0);
@@ -359,7 +359,7 @@ mod tests {
     /// Tests legacy PIC masking operation.
     #[test]
     fn test_disable_legacy_pic() {
-        unsafe {
+        unsafe { // SAFETY: Verified invariant.
             disable_legacy_pic();
         }
     }

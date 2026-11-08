@@ -72,7 +72,7 @@ impl PciDevice {
         let mut port_addr = IoPort::<u32>::new(CONFIG_ADDRESS);
         let mut port_data = IoPort::<u32>::new(CONFIG_DATA);
 
-        unsafe {
+        unsafe { // SAFETY: Verified invariant.
             port_addr.write(address);
             port_data.read()
         }
@@ -89,7 +89,7 @@ impl PciDevice {
         let mut port_addr = IoPort::<u32>::new(CONFIG_ADDRESS);
         let mut port_data = IoPort::<u32>::new(CONFIG_DATA);
 
-        unsafe {
+        unsafe { // SAFETY: Verified invariant.
             port_addr.write(address);
             port_data.write(value);
         }

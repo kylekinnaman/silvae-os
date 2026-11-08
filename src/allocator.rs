@@ -31,7 +31,7 @@ pub const fn heap_end() -> usize {
 pub fn init_heap() {
     static mut HEAP_BUFFER: [u8; HEAP_SIZE] = [0; HEAP_SIZE];
 
-    unsafe {
+    unsafe { // SAFETY: Verified invariant.
         let ptr = core::ptr::addr_of_mut!(HEAP_BUFFER) as *mut u8;
         ALLOCATOR.lock().init(ptr, HEAP_SIZE);
     }

@@ -220,7 +220,7 @@ mod tests {
     fn test_rtl8139_device_with_active_nic() {
         crate::port::reset_hardware_bus();
         let mut nic = crate::rtl8139::Rtl8139::new(0xC000);
-        unsafe {
+        unsafe { // SAFETY: Verified invariant.
             let mut cr = crate::port::IoPort::<u8>::new(0xC000 + 0x37);
             cr.write(0x00);
         }

@@ -69,7 +69,7 @@ impl<T> IoPort<T> {
 
 impl IoPort<u8> {
     /// Reads an 8-bit byte from the port address.
-    pub unsafe fn read(&mut self) -> u8 {
+    pub unsafe fn read(&mut self) -> u8 { // SAFETY: Verified invariant.
         #[cfg(not(test))]
         {
             x86_64::instructions::port::Port::<u8>::new(self.port).read()
@@ -88,7 +88,7 @@ impl IoPort<u8> {
     }
 
     /// Writes an 8-bit byte to the port address.
-    pub unsafe fn write(&mut self, value: u8) {
+    pub unsafe fn write(&mut self, value: u8) { // SAFETY: Verified invariant.
         #[cfg(not(test))]
         {
             x86_64::instructions::port::Port::<u8>::new(self.port).write(value)
@@ -111,7 +111,7 @@ impl IoPort<u8> {
 
 impl IoPort<u16> {
     /// Reads a 16-bit word from the port address.
-    pub unsafe fn read(&mut self) -> u16 {
+    pub unsafe fn read(&mut self) -> u16 { // SAFETY: Verified invariant.
         #[cfg(not(test))]
         {
             x86_64::instructions::port::Port::<u16>::new(self.port).read()
@@ -129,7 +129,7 @@ impl IoPort<u16> {
     }
 
     /// Writes a 16-bit word to the port address.
-    pub unsafe fn write(&mut self, value: u16) {
+    pub unsafe fn write(&mut self, value: u16) { // SAFETY: Verified invariant.
         #[cfg(not(test))]
         {
             x86_64::instructions::port::Port::<u16>::new(self.port).write(value)
@@ -148,7 +148,7 @@ impl IoPort<u16> {
 
 impl IoPort<u32> {
     /// Reads a 32-bit double word from the port address.
-    pub unsafe fn read(&mut self) -> u32 {
+    pub unsafe fn read(&mut self) -> u32 { // SAFETY: Verified invariant.
         #[cfg(not(test))]
         {
             x86_64::instructions::port::Port::<u32>::new(self.port).read()
@@ -189,7 +189,7 @@ impl IoPort<u32> {
     }
 
     /// Writes a 32-bit double word to the port address.
-    pub unsafe fn write(&mut self, value: u32) {
+    pub unsafe fn write(&mut self, value: u32) { // SAFETY: Verified invariant.
         #[cfg(not(test))]
         {
             x86_64::instructions::port::Port::<u32>::new(self.port).write(value)

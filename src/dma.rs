@@ -121,7 +121,7 @@ impl<const CAPACITY: usize> DmaRingBuffer<CAPACITY> {
         self.buffer.write_bytes(offset + 2, &len_bytes)?;
         self.buffer.write_bytes(offset + 4, payload)?;
 
-        // Return next aligned offset
+        // Yields next aligned offset
         let next_offset = (offset + total_len + 3) & !3;
         Ok(next_offset % CAPACITY)
     }

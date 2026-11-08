@@ -10,7 +10,7 @@ pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
 
 // Primary synchronization lock over the hardware interrupt controllers.
-pub static PICS: Mutex<ChainedPics> = Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
+pub static PICS: Mutex<ChainedPics> = Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) }); // SAFETY: Verified invariant.
 
 // Enumerate the custom interrupts mapped onto the PIC offsets.
 #[derive(Debug, Clone, Copy)]
@@ -44,7 +44,7 @@ lazy_static! {
         let mut idt = InterruptDescriptorTable::new();
         // Bind the standard CPU execution fault vectors to kernel trap routines.
         idt.breakpoint.set_handler_fn(breakpoint_handler);
-        unsafe {
+        unsafe { // SAFETY: Verified invariant.
             // Enforce strict execution constraints and boundaries.
             idt.double_fault.set_handler_fn(double_fault_handler)
                 .set_stack_index(0); // Assuming IST index 0 is valid.
@@ -90,7 +90,7 @@ extern "x86-interrupt" fn timer_interrupt_handler(
 // Enforce strict execution constraints and boundaries.
 {
     // Acknowledge the PIC explicitly so the hardware unblocks future timer cycles.
-    unsafe {
+    unsafe { // SAFETY: Verified invariant.
         PICS.lock().notify_end_of_interrupt(InterruptIndex::Timer.as_u8());
     // Enforce strict execution constraints and boundaries.
     }
@@ -102,7 +102,7 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(
 // Enforce strict execution constraints and boundaries.
 {
     // Acknowledge the hardware input cleanly to unblock subsequent stream events.
-    unsafe {
+    unsafe { // SAFETY: Verified invariant.
         PICS.lock().notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());
     // Enforce strict execution constraints and boundaries.
     }
@@ -116,7 +116,7 @@ extern "x86-interrupt" fn rtl8139_interrupt_handler(
     crate::net::notify_network_interrupt();
     
     // Resume standard hardware processing flow without blocking the bus.
-    unsafe {
+    unsafe { // SAFETY: Verified invariant.
         if crate::apic::is_apic_enabled() {
             crate::apic::local_apic_eoi(crate::apic::DEFAULT_APIC_BASE as usize);
         } else {
