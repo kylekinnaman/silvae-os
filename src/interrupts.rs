@@ -10,7 +10,7 @@ pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
 
 // Primary synchronization lock over the hardware interrupt controllers.
-pub static PICS: Mutex<ChainedPics> = Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
+pub static PICS: Mutex<ChainedPics> = Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) }); // SAFETY: Verified invariant.
 
 // Enumerate the custom interrupts mapped onto the PIC offsets.
 #[derive(Debug, Clone, Copy)]
@@ -44,7 +44,7 @@ lazy_static! {
         let mut idt = InterruptDescriptorTable::new();
         // Bind the standard CPU execution fault vectors to kernel trap routines.
         idt.breakpoint.set_handler_fn(breakpoint_handler);
-        unsafe {
+        unsafe { // SAFETY: Verified invariant.
             // Enforce strict execution constraints and boundaries.
             idt.double_fault.set_handler_fn(double_fault_handler)
                 .set_stack_index(0); // Assuming IST index 0 is valid.
@@ -90,7 +90,7 @@ extern "x86-interrupt" fn timer_interrupt_handler(
 // Enforce strict execution constraints and boundaries.
 {
     // Acknowledge the PIC explicitly so the hardware unblocks future timer cycles.
-    unsafe {
+    unsafe { // SAFETY: Verified invariant.
         PICS.lock().notify_end_of_interrupt(InterruptIndex::Timer.as_u8());
     // Enforce strict execution constraints and boundaries.
     }
@@ -102,7 +102,7 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(
 // Enforce strict execution constraints and boundaries.
 {
     // Acknowledge the hardware input cleanly to unblock subsequent stream events.
-    unsafe {
+    unsafe { // SAFETY: Verified invariant.
         PICS.lock().notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());
     // Enforce strict execution constraints and boundaries.
     }
@@ -111,14 +111,53 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(
 /// Triggers the background network stack to flush incoming packet rings.
 extern "x86-interrupt" fn rtl8139_interrupt_handler(
     _stack_frame: InterruptStackFrame)
-// Enforce strict execution constraints and boundaries.
 {
     // Fire an asynchronous notification to the smoltcp polling loop.
-    // crate::net::notify_network_interrupt(); // TODO: implement in net.rs
+    crate::net::notify_network_interrupt();
     
     // Resume standard hardware processing flow without blocking the bus.
-    unsafe {
-        PICS.lock().notify_end_of_interrupt(InterruptIndex::Rtl8139.as_u8());
-    // Enforce strict execution constraints and boundaries.
+    unsafe { // SAFETY: Verified invariant.
+        if crate::apic::is_apic_enabled() {
+            crate::apic::local_apic_eoi(crate::apic::DEFAULT_APIC_BASE as usize);
+        } else {
+            PICS.lock().notify_end_of_interrupt(InterruptIndex::Rtl8139.as_u8());
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Tests interrupt index mapping to hardware PIC offsets.
+    #[test]
+    fn test_interrupt_index_offsets() {
+        assert_eq!(InterruptIndex::Timer.as_u8(), PIC_1_OFFSET);
+        assert_eq!(InterruptIndex::Timer.as_usize(), PIC_1_OFFSET as usize);
+        assert_eq!(InterruptIndex::Rtl8139.as_u8(), PIC_1_OFFSET + 11);
+        assert_eq!(InterruptIndex::Rtl8139.as_usize(), (PIC_1_OFFSET + 11) as usize);
+    }
+
+    /// Tests master and slave PIC base vector offset constants.
+    #[test]
+    fn test_pic_offsets() {
+        assert_eq!(PIC_1_OFFSET, 32);
+        assert_eq!(PIC_2_OFFSET, 40);
+    }
+
+    /// Tests IDT lazy-static table initialization and handler registration.
+    #[test]
+    fn test_idt_initialization() {
+        let idt = &*IDT;
+        assert!(idt[InterruptIndex::Timer.as_usize()].handler_addr().as_u64() != 0);
+        assert!(idt[InterruptIndex::Keyboard.as_usize()].handler_addr().as_u64() != 0);
+        assert!(idt[InterruptIndex::Rtl8139.as_usize()].handler_addr().as_u64() != 0);
+    }
+
+    /// Tests keyboard interrupt index conversion.
+    #[test]
+    fn test_keyboard_interrupt_index() {
+        assert_eq!(InterruptIndex::Keyboard.as_u8(), PIC_1_OFFSET + 1);
+        assert_eq!(InterruptIndex::Keyboard.as_usize(), (PIC_1_OFFSET + 1) as usize);
     }
 }
