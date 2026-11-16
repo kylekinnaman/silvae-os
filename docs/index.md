@@ -1,6 +1,6 @@
 # `silvae-os` — Exhaustive AST, DAG & Stack Implementation Reference
 
-This document provides the complete developer, autonomous agent AST/DAG, and patent-review implementation reference for `silvae-os`. Every source module, included AST fragment (`*__p00*.rs`), manifest (`.toml`, `package.json`, `pubspec.yaml`), build script (`build.rs`, `.sh`), agent definition, UI template (`.svelte`, `.html`, `.css`, `.dart`), and packaging descriptor that participates in building `silvae-os` is cataloged below with its relative file link, line numbers, DAG edges, data structures, and function signatures.
+This document provides the complete developer, autonomous agent AST/DAG, and patent-review implementation reference for `silvae-os`. Every source module, manifest (`.toml`, `package.json`, `pubspec.yaml`), build script (`build.rs`, `.sh`), agent definition, UI template (`.svelte`, `.html`, `.css`, `.dart`), and packaging descriptor that participates in building `silvae-os` is cataloged below with its relative file link, line numbers, DAG edges, data structures, and function signatures.
 
 ## 1. Product File Inventory & Stack Build Summary
 
@@ -233,6 +233,11 @@ flowchart TD
   - [`pub fn as_u8(self) -> u8`](../src/interrupts.rs#L28) — Convert the semantic enum index directly to the target IRQ offset byte.
   - [`pub fn as_usize(self) -> usize`](../src/interrupts.rs#L34) — Map the underlying byte index safely into the system usize alignment.
   - [`pub fn init_idt() -> ()`](../src/interrupts.rs#L64) — Populates the CPU registers with the statically mapped Interrupt Descriptor Table.
+  - [`priv extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) -> ()`](../src/interrupts.rs#L70) — General trap routine halting execution when a breakpoint flag triggers.
+  - [`priv extern "x86-interrupt" fn double_fault_handler(stack_frame: InterruptStackFrame, _error_code: u64) -> !`](../src/interrupts.rs#L79) — Fatal error handler preventing arbitrary code execution cascading beyond memory boundaries.
+  - [`priv extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) -> ()`](../src/interrupts.rs#L88) — Internal background tick simulating OS scheduling and clock drift.
+  - [`priv extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStackFrame) -> ()`](../src/interrupts.rs#L100) — Translates raw external key presses into sanitized input queues.
+  - [`priv extern "x86-interrupt" fn rtl8139_interrupt_handler(_stack_frame: InterruptStackFrame) -> ()`](../src/interrupts.rs#L112) — Triggers the background network stack to flush incoming packet rings.
   - [`priv fn test_interrupt_index_offsets() -> ()`](../src/interrupts.rs#L134) — Tests interrupt index mapping to hardware PIC offsets.
   - [`priv fn test_pic_offsets() -> ()`](../src/interrupts.rs#L143) — Tests master and slave PIC base vector offset constants.
   - [`priv fn test_idt_initialization() -> ()`](../src/interrupts.rs#L150) — Tests IDT lazy-static table initialization and handler registration.
