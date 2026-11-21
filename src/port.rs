@@ -217,3 +217,52 @@ impl IoPort<u32> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Verifies 8-bit, 16-bit, and 32-bit port register roundtrips and unmapped port fallbacks.
+    #[test]
+    fn test_io_port_widths_and_unmapped_reads() {
+        reset_hardware_bus();
+        // SAFETY: Under `#[cfg(test)]`, `IoPort` operates purely against the in-memory `REGISTER_BUS`.
+        unsafe {
+            let mut unmapped_u8 = IoPort::<u8>::new(0x0080);
+            assert_eq!(unmapped_u8.read(), 0);
+            unmapped_u8.write(0xAA);
+
+            let mut rtl_u16 = IoPort::<u16>::new(0xC040);
+            rtl_u16.write(0xBEEF);
+            assert_eq!(rtl_u16.read(), 0xBEEF);
+
+            let mut unmapped_u16 = IoPort::<u16>::new(0x0080);
+            assert_eq!(unmapped_u16.read(), 0);
+            unmapped_u16.write(0x1234);
+
+            let mut rtl_u32 = IoPort::<u32>::new(0xC050);
+            rtl_u32.write(0xDEAD_BEEF);
+            assert_eq!(rtl_u32.read(), 0xDEAD_BEEF);
+
+            let mut unmapped_u32 = IoPort::<u32>::new(0x0080);
+            assert_eq!(unmapped_u32.read(), 0);
+            unmapped_u32.write(0x1122_3344);
+
+            let dev = crate::pci::PciDevice {
+                bus: 0,
+                slot: 1,
+                function: 0,
+                vendor_id: 0x10EC,
+                device_id: 0x8139,
+                class: 0x02,
+                subclass: 0x00,
+            };
+            register_pci_devices(alloc::vec![dev]);
+            let mut cfg_addr = IoPort::<u32>::new(0xCF8);
+            let mut cfg_data = IoPort::<u32>::new(0xCFC);
+            cfg_addr.write((1u32 << 31) | (1u32 << 11) | 0x3C);
+            assert_eq!(cfg_data.read(), 0);
+        }
+        reset_hardware_bus();
+    }
+}
