@@ -5,7 +5,7 @@ This document provides the complete developer, autonomous agent AST/DAG, and pat
 ## 1. Product File Inventory & Stack Build Summary
 
 - **Product Root**: `./silvae-os/`
-- **Total Stack Files Cataloged**: `14`
+- **Total Stack Files Cataloged**: `17`
 
 | File Path | Stack Build Role | Lines | Bytes |
 | :--- | :--- | ---: | ---: |
@@ -14,13 +14,16 @@ This document provides the complete developer, autonomous agent AST/DAG, and pat
 | [`builder/src/main.rs`](../builder/src/main.rs) | Primary Rust Crate Entrypoint & Module Root (`main.rs`) | `29` | `1116` |
 | [`rust-toolchain.toml`](../rust-toolchain.toml) | TOML Configuration & Toolchain Specification | `2` | `32` |
 | [`src/allocator.rs`](../src/allocator.rs) | Rust Implementation Module (Structs, Traits, State Machines & Runtime Logic) | `58` | `1718` |
-| [`src/apic.rs`](../src/apic.rs) | Rust Implementation Module (Structs, Traits, State Machines & Runtime Logic) | `365` | `13183` |
+| [`src/apic.rs`](../src/apic.rs) | Rust Implementation Module (Structs, Traits, State Machines & Runtime Logic) | `245` | `9097` |
+| [`src/apic_tests.rs`](../src/apic_tests.rs) | Rust Integration / Verification Test & Benchmark Suite | `121` | `3753` |
 | [`src/dma.rs`](../src/dma.rs) | Rust Implementation Module (Structs, Traits, State Machines & Runtime Logic) | `270` | `9580` |
 | [`src/interrupts.rs`](../src/interrupts.rs) | Rust Implementation Module (Structs, Traits, State Machines & Runtime Logic) | `163` | `6524` |
-| [`src/main.rs`](../src/main.rs) | Primary Rust Crate Entrypoint & Module Root (`main.rs`) | `717` | `33985` |
-| [`src/net.rs`](../src/net.rs) | Rust Implementation Module (Structs, Traits, State Machines & Runtime Logic) | `254` | `9332` |
+| [`src/main.rs`](../src/main.rs) | Primary Rust Crate Entrypoint & Module Root (`main.rs`) | `106` | `3210` |
+| [`src/main_tests.rs`](../src/main_tests.rs) | Rust Integration / Verification Test & Benchmark Suite | `250` | `8499` |
+| [`src/net.rs`](../src/net.rs) | Rust Implementation Module (Structs, Traits, State Machines & Runtime Logic) | `254` | `9328` |
+| [`src/pairing.rs`](../src/pairing.rs) | Rust Implementation Module (Structs, Traits, State Machines & Runtime Logic) | `45` | `2340` |
 | [`src/pci.rs`](../src/pci.rs) | Rust Implementation Module (Structs, Traits, State Machines & Runtime Logic) | `346` | `11664` |
-| [`src/port.rs`](../src/port.rs) | Rust Implementation Module (Structs, Traits, State Machines & Runtime Logic) | `219` | `7686` |
+| [`src/port.rs`](../src/port.rs) | Rust Implementation Module (Structs, Traits, State Machines & Runtime Logic) | `268` | `9384` |
 | [`src/rtl8139.rs`](../src/rtl8139.rs) | Rust Implementation Module (Structs, Traits, State Machines & Runtime Logic) | `293` | `11816` |
 | [`x86_64-silvae_os.json`](../x86_64-silvae_os.json) | Stack Configuration / Resource Asset (`.json`) | `14` | `422` |
 
@@ -40,25 +43,30 @@ flowchart TD
     Cargo_toml["Cargo.toml"] --> features["features"]
     builder_Cargo_toml["builder/Cargo.toml"] --> bootloader["bootloader"]
     src_allocator_rs["src/allocator.rs"] --> _["*"]
-    src_apic_rs["src/apic.rs"] --> _["*"]
+    src_apic_rs["src/apic.rs"] --> tests_rs["tests.rs"]
+    src_apic_tests_rs["src/apic_tests.rs"] --> _["*"]
     src_dma_rs["src/dma.rs"] --> _["*"]
     src_interrupts_rs["src/interrupts.rs"] --> _["*"]
-    src_main_rs["src/main.rs"] --> interrupts_rs["interrupts.rs"]
-    src_main_rs["src/main.rs"] --> pci_rs["pci.rs"]
-    src_main_rs["src/main.rs"] --> rtl8139_rs["rtl8139.rs"]
-    src_main_rs["src/main.rs"] --> net_rs["net.rs"]
     src_main_rs["src/main.rs"] --> allocator_rs["allocator.rs"]
     src_main_rs["src/main.rs"] --> apic_rs["apic.rs"]
     src_main_rs["src/main.rs"] --> dma_rs["dma.rs"]
+    src_main_rs["src/main.rs"] --> interrupts_rs["interrupts.rs"]
+    src_main_rs["src/main.rs"] --> net_rs["net.rs"]
+    src_main_rs["src/main.rs"] --> pairing_rs["pairing.rs"]
+    src_main_rs["src/main.rs"] --> pci_rs["pci.rs"]
     src_main_rs["src/main.rs"] --> port_rs["port.rs"]
-    src_main_rs["src/main.rs"] --> allocator["allocator"]
-    src_main_rs["src/main.rs"] --> apic["apic"]
-    src_main_rs["src/main.rs"] --> dma["dma"]
-    src_main_rs["src/main.rs"] --> interrupts["interrupts"]
+    src_main_rs["src/main.rs"] --> rtl8139_rs["rtl8139.rs"]
+    src_main_rs["src/main.rs"] --> tests_rs["tests.rs"]
+    src_main_tests_rs["src/main_tests.rs"] --> allocator["allocator"]
+    src_main_tests_rs["src/main_tests.rs"] --> apic["apic"]
+    src_main_tests_rs["src/main_tests.rs"] --> dma["dma"]
+    src_main_tests_rs["src/main_tests.rs"] --> interrupts["interrupts"]
+    src_main_tests_rs["src/main_tests.rs"] --> pairing["pairing"]
     src_net_rs["src/net.rs"] --> rtl8139["rtl8139"]
     src_net_rs["src/net.rs"] --> _["*"]
     src_pci_rs["src/pci.rs"] --> port["port"]
     src_pci_rs["src/pci.rs"] --> _["*"]
+    src_port_rs["src/port.rs"] --> _["*"]
     src_rtl8139_rs["src/rtl8139.rs"] --> port["port"]
     src_rtl8139_rs["src/rtl8139.rs"] --> _["*"]
 ```
@@ -130,8 +138,9 @@ flowchart TD
 
 ### [`src/apic.rs`](../src/apic.rs)
 - **Stack Build Role**: Rust Implementation Module (Structs, Traits, State Machines & Runtime Logic)
-- **Metrics**: `365` lines | `13183` bytes | SHA-256 prefix: `bdb5347b214193c0`
-- **DAG Import Dependencies (`use`)**: `core::sync::atomic::{AtomicBool, Ordering}`, `super::*`
+- **Metrics**: `245` lines | `9097` bytes | SHA-256 prefix: `695e9c0a93b6f1f1`
+- **Declared Submodules (`mod`)**: `tests`
+- **DAG Import Dependencies (`use`)**: `core::sync::atomic::{AtomicBool, Ordering}`
 - **Constants & Statics**:
   - [`pub PIC_MASTER_CMD: u16`](../src/apic.rs#L5) — Hardware port for the legacy PIC master control register.
   - [`pub PIC_SLAVE_CMD: u16`](../src/apic.rs#L7) — Hardware port for the legacy PIC slave control register.
@@ -176,14 +185,20 @@ flowchart TD
   - [`pub fn new_masked(vector: u8) -> Self`](../src/apic.rs#L197) — Creates a masked redirection entry.
   - [`pub fn encode(&self) -> (u32, u32)`](../src/apic.rs#L210) — Encodes the entry into two 32-bit registers (low and high dwords).
   - [`pub fn decode(low: u32, high: u32) -> Self`](../src/apic.rs#L231) — Decodes two 32-bit registers into an IoApicRedirectionEntry.
-  - [`priv fn test_apic_detection_logic() -> ()`](../src/apic.rs#L249) — Tests APIC feature flag detection and MSR base address parsing.
-  - [`priv fn test_apic_fallback_base_address() -> ()`](../src/apic.rs#L263) — Tests APIC fallback to standard physical base address when disabled.
-  - [`priv fn test_ioapic_redirection_encoding_decoding() -> ()`](../src/apic.rs#L274) — Tests encoding and decoding roundtrip for I/O APIC redirection entries.
-  - [`priv fn test_ioapic_masked_entry() -> ()`](../src/apic.rs#L299) — Tests default bitfield states for masked I/O APIC redirection table entries.
-  - [`priv fn test_apic_flag_state() -> ()`](../src/apic.rs#L308) — Tests global APIC status flag updates and query states.
-  - [`priv fn test_local_apic_operations() -> ()`](../src/apic.rs#L318) — Tests memory-mapped Local APIC register read, write, enable, and EOI operations.
-  - [`priv fn test_ioapic_standard_entry() -> ()`](../src/apic.rs#L347) — Tests standard unmasked edge-triggered redirection table entry creation.
-  - [`priv fn test_disable_legacy_pic() -> ()`](../src/apic.rs#L360) — Tests legacy PIC masking operation.
+
+### [`src/apic_tests.rs`](../src/apic_tests.rs)
+- **Stack Build Role**: Rust Integration / Verification Test & Benchmark Suite
+- **Metrics**: `121` lines | `3753` bytes | SHA-256 prefix: `5fb67d8240bba70a`
+- **DAG Import Dependencies (`use`)**: `super::*`
+- **Functions & Methods (`fn`)**:
+  - [`priv fn test_apic_detection_logic() -> ()`](../src/apic_tests.rs#L5) — Tests APIC feature flag detection and MSR base address parsing.
+  - [`priv fn test_apic_fallback_base_address() -> ()`](../src/apic_tests.rs#L19) — Tests APIC fallback to standard physical base address when disabled.
+  - [`priv fn test_ioapic_redirection_encoding_decoding() -> ()`](../src/apic_tests.rs#L30) — Tests encoding and decoding roundtrip for I/O APIC redirection entries.
+  - [`priv fn test_ioapic_masked_entry() -> ()`](../src/apic_tests.rs#L55) — Tests default bitfield states for masked I/O APIC redirection table entries.
+  - [`priv fn test_apic_flag_state() -> ()`](../src/apic_tests.rs#L64) — Tests global APIC status flag updates and query states.
+  - [`priv fn test_local_apic_operations() -> ()`](../src/apic_tests.rs#L74) — Tests memory-mapped Local APIC register read, write, enable, and EOI operations.
+  - [`priv fn test_ioapic_standard_entry() -> ()`](../src/apic_tests.rs#L103) — Tests standard unmasked edge-triggered redirection table entry creation.
+  - [`priv fn test_disable_legacy_pic() -> ()`](../src/apic_tests.rs#L116) — Tests legacy PIC masking operation.
 
 ### [`src/dma.rs`](../src/dma.rs)
 - **Stack Build Role**: Rust Implementation Module (Structs, Traits, State Machines & Runtime Logic)
@@ -245,36 +260,42 @@ flowchart TD
 
 ### [`src/main.rs`](../src/main.rs)
 - **Stack Build Role**: Primary Rust Crate Entrypoint & Module Root (`main.rs`)
-- **Metrics**: `717` lines | `33985` bytes | SHA-256 prefix: `e39613372c421d80`
-- **Declared Submodules (`mod`)**: `interrupts`, `pci`, `rtl8139`, `net`, `allocator`, `apic`, `dma`, `port`
-- **DAG Import Dependencies (`use`)**: `core::arch::asm`, `core::arch::x86_64::_rdtsc`, `core::fmt::Write`, `core::panic::PanicInfo`, `crate::allocator::{heap_size, heap_start, heap_end, HEAP_SIZE}`, `crate::apic::{ApicInfo, IoApicRedirectionEntry, DEFAULT_APIC_BASE}`, `crate::dma::{DmaBuffer, DmaRingBuffer, DMA_ALIGNMENT}`, `crate::interrupts::{InterruptIndex, PIC_1_OFFSET, PIC_2_OFFSET}`
+- **Metrics**: `106` lines | `3210` bytes | SHA-256 prefix: `50f2a3b2f7b05854`
+- **Declared Submodules (`mod`)**: `allocator`, `apic`, `dma`, `interrupts`, `net`, `pairing`, `pci`, `port`, `rtl8139`, `tests`
+- **DAG Import Dependencies (`use`)**: `core::arch::asm`, `core::arch::x86_64::_rdtsc`, `core::fmt::Write`, `core::panic::PanicInfo`
 - **Constants & Statics**:
-  - [`priv KEEP_HEADER: &u32`](../src/main.rs#L38)
+  - [`priv KEEP_HEADER: &u32`](../src/main.rs#L34)
 - **Functions & Methods (`fn`)**:
-  - [`pub extern "C" fn rust_main() -> !`](../src/main.rs#L42)
-  - [`priv fn panic(_info: &PanicInfo) -> !`](../src/main.rs#L162) — A hard panic handler for the OS loop.
-  - [`priv fn calibrated_tsc_reference() -> u64`](../src/main.rs#L173) — Returns calibrated timestamp counter reference value for arithmetic bound validation.
-  - [`priv fn test_pin_generation_bounds() -> ()`](../src/main.rs#L179) — Evaluates the boundaries of the PIN generation algorithm.
-  - [`priv fn test_pin_string_generation() -> ()`](../src/main.rs#L194) — Verifies the structural string generation logic for the output sequence.
-  - [`priv fn test_pin_string_edge_cases() -> ()`](../src/main.rs#L232) — Checks for edge case failures related to extreme TSC values.
-  - [`priv fn test_pin_string_overflow_behavior() -> ()`](../src/main.rs#L248) — Evaluates the PIN string generation limits against massive timestamp overflows.
-  - [`priv fn test_buffer_bounds() -> ()`](../src/main.rs#L260) — Tests the structural byte padding logic to ensure no buffer boundary overflows.
-  - [`priv fn test_line_injection_bounds() -> ()`](../src/main.rs#L291) — Evaluates the terminal ASCII output buffer against hardcoded line segment lengths.
-  - [`priv fn test_zero_pin_handling() -> ()`](../src/main.rs#L346) — Validates the LCG behavior when the pseudo-random seed hits zero.
-  - [`priv fn test_maximum_pin_handling() -> ()`](../src/main.rs#L380) — Evaluates the PIN constraint logic when reaching the absolute 32-bit maximums.
-  - [`priv fn test_invalid_tsc_values() -> ()`](../src/main.rs#L418) — Tests extreme TSC values against the LCG modulo math to prevent exceptions.
-  - [`priv fn test_pin_string_formatting_consistency() -> ()`](../src/main.rs#L436) — Confirms that formatting outputs maintain stable offsets regardless of time variables.
-  - [`priv fn test_no_panic_with_large_tsc() -> ()`](../src/main.rs#L466) — Checks the maximum u64 value behavior within the wrapped multiplication steps.
-  - [`priv fn test_pin_string_parsing_correctness() -> ()`](../src/main.rs#L480) — Verifies parsing logic correctly handles formatted space-delimited digits.
-  - [`priv fn test_line_bounds_checking() -> ()`](../src/main.rs#L519) — Checks that the screen presentation buffer maintains precise column dimensions.
-  - [`priv fn test_memory_alignment() -> ()`](../src/main.rs#L552) — Evaluates exact memory slices to prevent dangerous out-of-bounds pointer reads.
-  - [`priv fn test_activity1_interrupts_and_apic() -> ()`](../src/main.rs#L602) — Verifies Activity 1: Interrupts and APIC configuration mappings.
-  - [`priv fn test_activity2_dma_and_allocator() -> ()`](../src/main.rs#L634) — Verifies Activity 2: Dynamic Memory Management, Heap Boundaries, and DMA Ring Buffers.
-  - [`priv fn test_activity3_pci_driver_matching() -> ()`](../src/main.rs#L662) — Verifies Activity 3: PCI Bus Enumeration, Network Driver Matching, and Bus Mastering.
+  - [`pub extern "C" fn rust_main() -> !`](../src/main.rs#L39) — Bare-metal kernel entry point invoked from `boot.s`.
+  - [`priv fn panic(_info: &PanicInfo) -> !`](../src/main.rs#L100) — Hard panic handler halting bare-metal execution locally on fatal error.
+
+### [`src/main_tests.rs`](../src/main_tests.rs)
+- **Stack Build Role**: Rust Integration / Verification Test & Benchmark Suite
+- **Metrics**: `250` lines | `8499` bytes | SHA-256 prefix: `0dfbef607bbf69cb`
+- **DAG Import Dependencies (`use`)**: `crate::allocator::{heap_end, heap_size, heap_start, HEAP_SIZE}`, `crate::apic::{ApicInfo, IoApicRedirectionEntry, DEFAULT_APIC_BASE}`, `crate::dma::{DmaBuffer, DmaRingBuffer, DMA_ALIGNMENT}`, `crate::interrupts::{InterruptIndex, PIC_1_OFFSET, PIC_2_OFFSET}`, `crate::pairing::{build_welcome_banner, derive_pairing_pin, format_pairing_pin}`
+- **Functions & Methods (`fn`)**:
+  - [`priv fn calibrated_tsc_reference() -> u64`](../src/main_tests.rs#L4) — Returns calibrated timestamp counter reference value for arithmetic bound validation.
+  - [`priv fn test_pin_generation_bounds() -> ()`](../src/main_tests.rs#L10) — Evaluates the boundaries of the PIN generation algorithm.
+  - [`priv fn test_pin_string_generation() -> ()`](../src/main_tests.rs#L17) — Verifies the structural string generation logic for the output sequence.
+  - [`priv fn test_pin_string_edge_cases() -> ()`](../src/main_tests.rs#L33) — Checks for edge case failures related to extreme TSC values.
+  - [`priv fn test_pin_string_overflow_behavior() -> ()`](../src/main_tests.rs#L40) — Evaluates the PIN string generation limits against massive timestamp overflows.
+  - [`priv fn test_buffer_bounds() -> ()`](../src/main_tests.rs#L47) — Tests the structural byte padding logic to ensure no buffer boundary overflows.
+  - [`priv fn test_line_injection_bounds() -> ()`](../src/main_tests.rs#L55) — Evaluates the terminal ASCII output buffer against hardcoded line segment lengths.
+  - [`priv fn test_zero_pin_handling() -> ()`](../src/main_tests.rs#L63) — Validates the LCG behavior when the pseudo-random seed hits zero.
+  - [`priv fn test_maximum_pin_handling() -> ()`](../src/main_tests.rs#L75) — Evaluates the PIN constraint logic when reaching the absolute 64-bit maximums.
+  - [`priv fn test_invalid_tsc_values() -> ()`](../src/main_tests.rs#L90) — Tests extreme TSC values against the LCG modulo math to prevent exceptions.
+  - [`priv fn test_pin_string_formatting_consistency() -> ()`](../src/main_tests.rs#L99) — Confirms that formatting outputs maintain stable offsets regardless of time variables.
+  - [`priv fn test_no_panic_with_large_tsc() -> ()`](../src/main_tests.rs#L107) — Checks the maximum u64 value behavior within the wrapped multiplication steps.
+  - [`priv fn test_pin_string_parsing_correctness() -> ()`](../src/main_tests.rs#L113) — Verifies parsing logic correctly handles formatted space-delimited digits.
+  - [`priv fn test_line_bounds_checking() -> ()`](../src/main_tests.rs#L128) — Checks that the screen presentation buffer maintains precise column dimensions.
+  - [`priv fn test_memory_alignment() -> ()`](../src/main_tests.rs#L138) — Evaluates exact memory slices to prevent dangerous out-of-bounds pointer reads.
+  - [`priv fn test_activity1_interrupts_and_apic() -> ()`](../src/main_tests.rs#L146) — Verifies Activity 1: Interrupts and APIC configuration mappings.
+  - [`priv fn test_activity2_dma_and_allocator() -> ()`](../src/main_tests.rs#L174) — Verifies Activity 2: Dynamic Memory Management, Heap Boundaries, and DMA Ring Buffers.
+  - [`priv fn test_activity3_pci_driver_matching() -> ()`](../src/main_tests.rs#L202) — Verifies Activity 3: PCI Bus Enumeration, Network Driver Matching, and Bus Mastering.
 
 ### [`src/net.rs`](../src/net.rs)
 - **Stack Build Role**: Rust Implementation Module (Structs, Traits, State Machines & Runtime Logic)
-- **Metrics**: `254` lines | `9332` bytes | SHA-256 prefix: `6f82315b20dd256d`
+- **Metrics**: `254` lines | `9328` bytes | SHA-256 prefix: `d50c7309434917e9`
 - **DAG Import Dependencies (`use`)**: `alloc::collections::BTreeMap`, `alloc::vec`, `alloc::vec::Vec`, `crate::rtl8139::RTL8139_NIC`, `smoltcp::iface::{InterfaceBuilder, NeighborCache}`, `smoltcp::phy::{Device, DeviceCapabilities}`, `smoltcp::phy::{Device, RxToken, TxToken}`, `smoltcp::time::Instant`, `smoltcp::wire::{EthernetAddress, IpCidr, Ipv4Address}`, `spin::Mutex`, `super::*`
 - **Constants & Statics**:
   - [`pub NETWORK_INTERRUPT_PENDING: core::sync::atomic::AtomicBool`](../src/net.rs#L137) — Global flag recording hardware network packet arrival interrupts.
@@ -301,6 +322,17 @@ flowchart TD
   - [`priv fn test_network_interrupt_flags() -> ()`](../src/net.rs#L202) — Tests network hardware interrupt notification and atomic consumption.
   - [`priv fn test_init_and_poll_network() -> ()`](../src/net.rs#L212) — Tests smoltcp network interface initialization and poll dispatching.
   - [`priv fn test_rtl8139_device_with_active_nic() -> ()`](../src/net.rs#L220) — Tests packet reception and transmission when hardware NIC is active.
+
+### [`src/pairing.rs`](../src/pairing.rs)
+- **Stack Build Role**: Rust Implementation Module (Structs, Traits, State Machines & Runtime Logic)
+- **Metrics**: `45` lines | `2340` bytes | SHA-256 prefix: `1e3f81ffaba76d3f`
+- **Module Summary**: Pairing PIN generation and VGA welcome banner formatting for bare-metal boot.
+- **Constants & Statics**:
+  - [`pub PAIRING_LCG_MULTIPLIER: u64`](../src/pairing.rs#L4) — Multiplier for the 64-bit Linear Congruential Generator used for pairing PIN derivation.
+- **Functions & Methods (`fn`)**:
+  - [`pub fn derive_pairing_pin(tsc: u64) -> u32`](../src/pairing.rs#L7) — Derives an 8-digit pairing PIN (`0..100_000_000`) from a CPU timestamp counter sample.
+  - [`pub fn format_pairing_pin(mut pin: u32) -> [u8`](../src/pairing.rs#L13) — Formats an 8-digit numeric pairing PIN as `"XXXX XXXX"` into a 9-byte ASCII buffer.
+  - [`pub fn build_welcome_banner(pin_str: &[u8; 9]) -> [[u8`](../src/pairing.rs#L27) — Builds the 13-row by 80-column ASCII boot banner with the formatted pairing PIN injected.
 
 ### [`src/pci.rs`](../src/pci.rs)
 - **Stack Build Role**: Rust Implementation Module (Structs, Traits, State Machines & Runtime Logic)
@@ -340,8 +372,8 @@ flowchart TD
 
 ### [`src/port.rs`](../src/port.rs)
 - **Stack Build Role**: Rust Implementation Module (Structs, Traits, State Machines & Runtime Logic)
-- **Metrics**: `219` lines | `7686` bytes | SHA-256 prefix: `7fb300882a105ec0`
-- **DAG Import Dependencies (`use`)**: `core::marker::PhantomData`, `lazy_static::lazy_static`, `spin::Mutex`
+- **Metrics**: `268` lines | `9384` bytes | SHA-256 prefix: `bee0cf65d4efe2c1`
+- **DAG Import Dependencies (`use`)**: `core::marker::PhantomData`, `lazy_static::lazy_static`, `spin::Mutex`, `super::*`
 - **Data Structures (`struct`)**:
   - [`pub struct HardwareRegisterBus`](../src/port.rs#L11) — Global software register bus for I/O operations during testing. | Fields: `pci_address: u32`, `pci_devices: alloc::vec::Vec<crate::pci::PciDevice>`, `pci_command: u32`, `rtl8139_registers: [u8; 256]`, `rtl8139_mac: [u8; 6]`
   - [`pub struct IoPort`](../src/port.rs#L55) — Generic wrapper over x86 hardware I/O port operations. | Fields: `port: u16`, `_phantom: PhantomData<T>`
@@ -355,6 +387,7 @@ flowchart TD
   - [`pub unsafe fn write(&mut self, value: u16) -> ()`](../src/port.rs#L132) — Writes a 16-bit word to the port address.
   - [`pub unsafe fn read(&mut self) -> u32`](../src/port.rs#L151) — Reads a 32-bit double word from the port address.
   - [`pub unsafe fn write(&mut self, value: u32) -> ()`](../src/port.rs#L192) — Writes a 32-bit double word to the port address.
+  - [`priv fn test_io_port_widths_and_unmapped_reads() -> ()`](../src/port.rs#L227) — Verifies 8-bit, 16-bit, and 32-bit port register roundtrips and unmapped port fallbacks.
 
 ### [`src/rtl8139.rs`](../src/rtl8139.rs)
 - **Stack Build Role**: Rust Implementation Module (Structs, Traits, State Machines & Runtime Logic)
